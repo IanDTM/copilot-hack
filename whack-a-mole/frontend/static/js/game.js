@@ -25,6 +25,11 @@ class WhackAMoleGame {
         this.finalDifficultyElement = document.getElementById('final-difficulty');
         this.sessionIdElement = document.getElementById('session-id');
 
+        // High Score Elements
+        this.submitScoreBtn = document.getElementById('submit-score-btn');
+        this.playerNameInput = document.getElementById('player-name');
+        this.highScoreList = document.getElementById('high-score-list');
+
         // Game State
         this.holes = [];
         this.activeMole = null;
@@ -249,6 +254,7 @@ class WhackAMoleGame {
             console.log('Connected to game server');
             this.updateConnectionStatus(true);
             this.updateStatus('Connected to server. Ready to play!');
+            this.socket.emit('get_high_scores');
         });
 
         this.socket.on('disconnect', () => {
@@ -317,6 +323,10 @@ class WhackAMoleGame {
             this.updateButtonStates();
             this.showDifficultySelector();
         });
+
+        this.socket.on('high_scores_update', (data) => {
+            this.updateHighScores(data);
+        });
     }
 
     /**
@@ -366,6 +376,13 @@ class WhackAMoleGame {
         window.addEventListener('resize', () => {
             this.repositionHoles();
         });
+
+        // Submit Score Button
+        if (this.submitScoreBtn) {
+            this.submitScoreBtn.addEventListener('click', () => {
+                this.submitScore();
+            });
+        }
     }
 
     /**
@@ -652,6 +669,12 @@ class WhackAMoleGame {
 
         // Show modal
         this.gameOverModal.classList.remove('hidden');
+
+        // Reset submit button state
+        if (this.submitScoreBtn) {
+            this.submitScoreBtn.disabled = false;
+            this.submitScoreBtn.textContent = 'Submit Score';
+        }
     }
 
     /**
@@ -690,6 +713,77 @@ class WhackAMoleGame {
     updateStatus(message, type = 'info') {
         this.gameStatus.textContent = message;
         this.gameStatus.style.color = type === 'error' ? '#f87171' : '#4ade80';
+    }
+
+    /**
+     * Submit high score
+     */
+    submitScore() {
+        const name = this.playerNameInput.value.trim();
+        if (!name) {
+            alert('Please enter your name!');
+            return;
+        }
+
+        if (this.socket?.connected) {
+            this.socket.emit('submit_score', {
+                name: name,
+                score: parseInt(this.finalScoreElement.textContent) || 0
+            });
+
+            // Disable button to prevent double submission
+            this.submitScoreBtn.disabled = true;
+            this.submitScoreBtn.textContent = 'Submitted!';
+
+            setTimeout(() => {
+                this.gameOverModal.classList.add('hidden');
+                this.submitScoreBtn.disabled = false;
+                this.submitScoreBtn.textContent = 'Submit Score';
+                this.playerNameInput.value = '';
+            }, 1000);
+        }
+    }
+
+    /**
+     * Update high score list in sidebar
+     */
+    updateHighScores(scores) {
+        if (!this.highScoreList) return;
+
+        this.highScoreList.innerHTML = '';
+
+        if (scores.length === 0) {
+            this.highScoreList.innerHTML = '<li style="text-align:center; color:#94a3b8; padding:20px;">No scores yet!</li>';
+            return;
+        }
+
+        scores.forEach((score, index) => {
+            const li = document.createElement('li');
+            li.className = `high-score-item rank-${index + 1}`;
+
+            const rank = index + 1;
+            let rankDisplay = rank;
+            if (rank === 1) rankDisplay = '🥇';
+            if (rank === 2) rankDisplay = '🥈';
+            if (rank === 3) rankDisplay = '🥉';
+
+            li.innerHTML = `
+                <span class="score-rank">${rankDisplay}</span>
+                <span class="score-name">${this.escapeHtml(score.name)}</span>
+                <span class="score-val">${score.score}</span>
+            `;
+
+            this.highScoreList.appendChild(li);
+        });
+    }
+
+    /**
+     * Helper to escape HTML to prevent XSS
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     /**

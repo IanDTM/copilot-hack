@@ -32,41 +32,54 @@
             </div>
         </header>
 
-        <div class="game-instructions">
-            <p>Use keys <kbd>1</kbd> - <kbd>6</kbd> to whack the moles!</p>
-        </div>
+        <div class="content-wrapper">
+            <div class="main-game-content">
+                <div class="game-instructions">
+                    <p>Use keys <kbd>1</kbd> - <kbd>6</kbd> to whack the moles!</p>
+                </div>
 
-        <div class="difficulty-selector" id="difficulty-selector">
-            <span class="difficulty-label">Select Difficulty:</span>
-            <div class="difficulty-buttons">
-                <button class="diff-btn" data-difficulty="easy">
-                    <span class="diff-icon">🐢</span>
-                    <span class="diff-name">Easy</span>
-                    <span class="diff-desc">2.0s timeout</span>
-                </button>
-                <button class="diff-btn active" data-difficulty="medium">
-                    <span class="diff-icon">🐇</span>
-                    <span class="diff-name">Medium</span>
-                    <span class="diff-desc">1.5s timeout</span>
-                </button>
-                <button class="diff-btn" data-difficulty="hard">
-                    <span class="diff-icon">🦅</span>
-                    <span class="diff-name">Hard</span>
-                    <span class="diff-desc">1.0s timeout</span>
-                </button>
+                <div class="difficulty-selector" id="difficulty-selector">
+                    <span class="difficulty-label">Select Difficulty:</span>
+                    <div class="difficulty-buttons">
+                        <button class="diff-btn" data-difficulty="easy">
+                            <span class="diff-icon">🐢</span>
+                            <span class="diff-name">Easy</span>
+                            <span class="diff-desc">2.0s timeout</span>
+                        </button>
+                        <button class="diff-btn active" data-difficulty="medium">
+                            <span class="diff-icon">🐇</span>
+                            <span class="diff-name">Medium</span>
+                            <span class="diff-desc">1.5s timeout</span>
+                        </button>
+                        <button class="diff-btn" data-difficulty="hard">
+                            <span class="diff-icon">🦅</span>
+                            <span class="diff-name">Hard</span>
+                            <span class="diff-desc">1.0s timeout</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="game-area" class="game-area">
+                    <!-- Mole holes will be dynamically positioned here -->
+                </div>
+
+                <div class="game-controls">
+                    <button id="start-btn" class="btn btn-start">Start Game</button>
+                    <button id="stop-btn" class="btn btn-stop" disabled>Stop Game</button>
+                </div>
+
+                <div id="game-status" class="game-status"></div>
+            </div>
+
+            <div class="high-score-sidebar">
+                <h2>🏆 High Scores</h2>
+                <div class="high-score-list-container">
+                    <ul id="high-score-list">
+                        <li class="loading-scores">Loading scores...</li>
+                    </ul>
+                </div>
             </div>
         </div>
-
-        <div id="game-area" class="game-area">
-            <!-- Mole holes will be dynamically positioned here -->
-        </div>
-
-        <div class="game-controls">
-            <button id="start-btn" class="btn btn-start">Start Game</button>
-            <button id="stop-btn" class="btn btn-stop" disabled>Stop Game</button>
-        </div>
-
-        <div id="game-status" class="game-status"></div>
 
         <div id="game-over-modal" class="modal hidden">
             <div class="modal-content">
@@ -77,6 +90,12 @@
                     <p>Moles Missed: <span id="final-misses">0</span></p>
                     <p>Accuracy: <span id="accuracy">0</span>%</p>
                 </div>
+
+                <div class="score-submission">
+                    <input type="text" id="player-name" placeholder="Enter your name" maxlength="10">
+                    <button id="submit-score-btn" class="btn btn-submit">Submit Score</button>
+                </div>
+
                 <button id="play-again-btn" class="btn btn-start">Play Again</button>
             </div>
         </div>
