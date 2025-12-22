@@ -107,6 +107,10 @@ class GameState:
 # Global game state per session
 game_states: dict[str, GameState] = {}
 
+# Global high scores
+# List of dicts: {'name': str, 'score': int, 'difficulty': str, 'date': str}
+high_scores: list[dict] = []
+
 
 class MoleSpawnerThread(threading.Thread):
     """
@@ -432,6 +436,36 @@ def handle_stop_game():
 
     if game_state:
         emit("game_stopped", {"score": game_state.score, "misses": game_state.misses})
+
+
+@socketio.on("get_high_scores")
+def handle_get_high_scores():
+    """Send current high scores to the client."""
+    emit("high_scores_update", high_scores)
+
+
+@socketio.on("submit_score")
+def handle_submit_score(data):
+    """Handle high score submission."""
+    name = data.get("name", "Anonymous")
+    score = data.get("score", 0)
+    difficulty = data.get("difficulty", "medium")
+
+    # Add new score
+    new_entry = {
+        "name": name[:10],  # Limit name length
+        "score": score,
+        "difficulty": difficulty,
+        "date": time.strftime("%Y-%m-%d"),
+    }
+    high_scores.append(new_entry)
+
+    # Sort by score (descending) and keep top 10
+    high_scores.sort(key=lambda x: x["score"], reverse=True)
+    del high_scores[10:]
+
+    # Broadcast updated scores to all clients
+    emit("high_scores_update", high_scores, broadcast=True)
 
 
 if __name__ == "__main__":
