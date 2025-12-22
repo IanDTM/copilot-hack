@@ -1,0 +1,665 @@
+/* Whack-a-Mole Game Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    color: #fff;
+    overflow: hidden;
+}
+
+.game-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Header Styles */
+.game-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.game-header h1 {
+    font-size: 2.5rem;
+    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+    margin-bottom: 15px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+.game-info {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    flex-wrap: wrap;
+}
+
+.info-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px 25px;
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.info-item .label {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-right: 8px;
+}
+
+.info-item .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #4ade80;
+}
+
+/* Instructions */
+.game-instructions {
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+.game-instructions kbd {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Game Area */
+.game-area {
+    flex: 1;
+    position: relative;
+    background: linear-gradient(180deg, #2d5a27 0%, #1e3d1a 100%);
+    border-radius: 20px;
+    min-height: 500px;
+    border: 4px solid #4a7c44;
+    box-shadow:
+        inset 0 0 50px rgba(0, 0, 0, 0.3),
+        0 10px 30px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+/* Grass texture overlay */
+.game-area::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image:
+        radial-gradient(circle at 20% 30%, rgba(76, 175, 80, 0.3) 2px, transparent 2px),
+        radial-gradient(circle at 60% 70%, rgba(76, 175, 80, 0.2) 2px, transparent 2px),
+        radial-gradient(circle at 80% 20%, rgba(76, 175, 80, 0.25) 2px, transparent 2px);
+    background-size: 100px 100px;
+    pointer-events: none;
+}
+
+/* Mole Hole */
+.mole-hole {
+    position: absolute;
+    width: 120px;
+    height: 100px;
+    transform: translate(-50%, -50%);
+    cursor: pointer;
+    transition: transform 0.1s ease;
+}
+
+.mole-hole:hover {
+    transform: translate(-50%, -50%) scale(1.05);
+}
+
+.mole-hole:active {
+    transform: translate(-50%, -50%) scale(0.95);
+}
+
+.hole-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+/* The hole itself */
+.hole {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 40px;
+    background: radial-gradient(ellipse at center, #1a1a1a 0%, #2d2d2d 70%, #3d3d3d 100%);
+    border-radius: 50%;
+    box-shadow:
+        inset 0 5px 15px rgba(0, 0, 0, 0.8),
+        0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+/* Hole dirt ring */
+.hole::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -15px;
+    right: -15px;
+    bottom: -5px;
+    background: radial-gradient(ellipse at center, #5d4037 0%, #4e342e 50%, transparent 100%);
+    border-radius: 50%;
+    z-index: -1;
+}
+
+/* Hole number label */
+.hole-label {
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #ffd700 0%, #ffb300 100%);
+    color: #1a1a2e;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+    box-shadow:
+        0 3px 10px rgba(0, 0, 0, 0.4),
+        inset 0 2px 5px rgba(255, 255, 255, 0.4);
+    z-index: 10;
+    border: 2px solid #e6a800;
+}
+
+/* The mole */
+.mole {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    width: 70px;
+    height: 70px;
+    transition: transform 0.15s ease-out, opacity 0.15s ease-out, visibility 0.15s ease-out;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+}
+
+.mole.active {
+    transform: translateX(-50%) translateY(10%);
+    animation: moleWiggle 0.3s ease-in-out infinite;
+    opacity: 1;
+    visibility: visible;
+}
+
+@keyframes moleWiggle {
+
+    0%,
+    100% {
+        transform: translateX(-50%) translateY(10%) rotate(-2deg);
+    }
+
+    50% {
+        transform: translateX(-50%) translateY(10%) rotate(2deg);
+    }
+}
+
+.mole-body {
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at 50% 30%, #8b6914 0%, #6b4f0f 50%, #4a3609 100%);
+    border-radius: 50% 50% 40% 40%;
+    position: relative;
+    box-shadow:
+        0 5px 15px rgba(0, 0, 0, 0.4),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* Mole face */
+.mole-face {
+    position: absolute;
+    top: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 80%;
+    height: 60%;
+}
+
+.mole-eyes {
+    display: flex;
+    justify-content: space-around;
+    padding: 0 10px;
+    margin-bottom: 5px;
+}
+
+.mole-eye {
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    position: relative;
+}
+
+.mole-eye::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 4px;
+    width: 6px;
+    height: 6px;
+    background: #1a1a1a;
+    border-radius: 50%;
+}
+
+.mole-nose {
+    width: 18px;
+    height: 14px;
+    background: radial-gradient(ellipse at center, #ff6b6b 0%, #d32f2f 100%);
+    border-radius: 50%;
+    margin: 0 auto;
+    position: relative;
+}
+
+.mole-nose::before,
+.mole-nose::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    width: 3px;
+    height: 8px;
+    background: #4a3609;
+    border-radius: 2px;
+}
+
+.mole-nose::before {
+    left: -8px;
+    transform: rotate(-30deg);
+}
+
+.mole-nose::after {
+    right: -8px;
+    transform: rotate(30deg);
+}
+
+/* Whacked animation */
+.mole.whacked {
+    animation: whacked 0.3s ease-out forwards;
+    visibility: visible;
+}
+
+@keyframes whacked {
+    0% {
+        transform: translateX(-50%) translateY(10%);
+        opacity: 1;
+    }
+
+    30% {
+        transform: translateX(-50%) translateY(0%) scale(1.2) rotate(10deg);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateX(-50%) translateY(100%) scale(0.8);
+        opacity: 0;
+    }
+}
+
+/* Missed animation */
+.mole.missed {
+    animation: missed 0.3s ease-out forwards;
+    visibility: visible;
+}
+
+@keyframes missed {
+    0% {
+        transform: translateX(-50%) translateY(10%);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateX(-50%) translateY(100%);
+        opacity: 0;
+    }
+}
+
+/* Hit effect */
+.hit-effect {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 2rem;
+    animation: hitPop 0.5s ease-out forwards;
+    z-index: 20;
+    pointer-events: none;
+}
+
+@keyframes hitPop {
+    0% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(0.5);
+    }
+
+    50% {
+        transform: translateX(-50%) translateY(-30px) scale(1.2);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-50px) scale(1);
+    }
+}
+
+/* Timer warning */
+.timer-warning {
+    color: #ff6b6b !important;
+    animation: timerBlink 0.5s ease-in-out infinite;
+}
+
+@keyframes timerBlink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Game Controls */
+.game-controls {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.btn {
+    padding: 12px 30px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-start {
+    background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+    color: #1a1a2e;
+    box-shadow: 0 4px 15px rgba(74, 222, 128, 0.4);
+}
+
+.btn-start:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(74, 222, 128, 0.5);
+}
+
+.btn-stop {
+    background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(248, 113, 113, 0.4);
+}
+
+.btn-stop:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(248, 113, 113, 0.5);
+}
+
+/* Game Status */
+.game-status {
+    text-align: center;
+    margin-top: 15px;
+    font-size: 1rem;
+    min-height: 25px;
+    color: #4ade80;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #1e3a5f 0%, #16213e 100%);
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: modalPop 0.3s ease-out;
+}
+
+@keyframes modalPop {
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-content h2 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+}
+
+.final-stats {
+    margin: 20px 0;
+}
+
+.final-stats p {
+    font-size: 1.2rem;
+    margin: 10px 0;
+}
+
+.final-stats span {
+    font-weight: bold;
+    color: #4ade80;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .game-header h1 {
+        font-size: 1.8rem;
+    }
+
+    .game-info {
+        gap: 15px;
+    }
+
+    .info-item {
+        padding: 8px 15px;
+    }
+
+    .mole-hole {
+        width: 90px;
+        height: 75px;
+    }
+
+    .hole {
+        width: 75px;
+        height: 30px;
+    }
+
+    .mole {
+        width: 50px;
+        height: 50px;
+    }
+
+    .hole-label {
+        width: 25px;
+        height: 25px;
+        font-size: 1rem;
+    }
+}
+
+/* Connection status */
+.connection-status {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.connection-status.connected {
+    background: rgba(74, 222, 128, 0.2);
+    color: #4ade80;
+    border: 1px solid #4ade80;
+}
+
+.connection-status.disconnected {
+    background: rgba(248, 113, 113, 0.2);
+    color: #f87171;
+    border: 1px solid #f87171;
+}
+
+/* Difficulty Selector */
+.difficulty-selector {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.diff-btn {
+    padding: 10px 25px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(5px);
+}
+
+.diff-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.diff-btn.active {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Easy - Green */
+.diff-btn[data-difficulty="easy"] {
+    border-color: #4ade80;
+}
+
+.diff-btn[data-difficulty="easy"]:hover,
+.diff-btn[data-difficulty="easy"].active {
+    background: rgba(74, 222, 128, 0.3);
+    border-color: #4ade80;
+}
+
+/* Medium - Yellow/Orange */
+.diff-btn[data-difficulty="medium"] {
+    border-color: #fbbf24;
+}
+
+.diff-btn[data-difficulty="medium"]:hover,
+.diff-btn[data-difficulty="medium"].active {
+    background: rgba(251, 191, 36, 0.3);
+    border-color: #fbbf24;
+}
+
+/* Hard - Red */
+.diff-btn[data-difficulty="hard"] {
+    border-color: #f87171;
+}
+
+.diff-btn[data-difficulty="hard"]:hover,
+.diff-btn[data-difficulty="hard"].active {
+    background: rgba(248, 113, 113, 0.3);
+    border-color: #f87171;
+}
+
+/* Difficulty Display */
+.difficulty-display {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.difficulty-display .value {
+    color: #fbbf24;
+}
+
+/* Session Footer */
+.session-footer {
+    text-align: center;
+    padding: 8px;
+    margin-top: auto;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+.session-label {
+    margin-right: 5px;
+}
+
+.session-value {
+    font-family: 'Courier New', monospace;
+    color: #60a5fa;
+}

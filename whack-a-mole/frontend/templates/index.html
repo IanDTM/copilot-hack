@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Whack-a-Mole</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+    <div class="game-container">
+        <header class="game-header">
+            <h1>🔨 Whack-a-Mole 🐹</h1>
+            <div class="game-info">
+                <div class="info-item">
+                    <span class="label">Score:</span>
+                    <span id="score" class="value">0</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Misses:</span>
+                    <span id="misses" class="value">0</span>
+                </div>
+                <div class="info-item">
+                    <span class="label">Time:</span>
+                    <span id="timer" class="value">60</span>s
+                </div>
+                <div class="info-item difficulty-display hidden" id="difficulty-display">
+                    <span class="label">Mode:</span>
+                    <span id="current-difficulty" class="value">MEDIUM</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="game-instructions">
+            <p>Use keys <kbd>1</kbd> - <kbd>6</kbd> to whack the moles!</p>
+        </div>
+
+        <div class="difficulty-selector" id="difficulty-selector">
+            <span class="difficulty-label">Select Difficulty:</span>
+            <div class="difficulty-buttons">
+                <button class="diff-btn" data-difficulty="easy">
+                    <span class="diff-icon">🐢</span>
+                    <span class="diff-name">Easy</span>
+                    <span class="diff-desc">2.0s timeout</span>
+                </button>
+                <button class="diff-btn active" data-difficulty="medium">
+                    <span class="diff-icon">🐇</span>
+                    <span class="diff-name">Medium</span>
+                    <span class="diff-desc">1.5s timeout</span>
+                </button>
+                <button class="diff-btn" data-difficulty="hard">
+                    <span class="diff-icon">🦅</span>
+                    <span class="diff-name">Hard</span>
+                    <span class="diff-desc">1.0s timeout</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="game-area" class="game-area">
+            <!-- Mole holes will be dynamically positioned here -->
+        </div>
+
+        <div class="game-controls">
+            <button id="start-btn" class="btn btn-start">Start Game</button>
+            <button id="stop-btn" class="btn btn-stop" disabled>Stop Game</button>
+        </div>
+
+        <div id="game-status" class="game-status"></div>
+
+        <div id="game-over-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>🎮 Game Over!</h2>
+                <div class="final-stats">
+                    <p>Difficulty: <span id="final-difficulty">Medium</span></p>
+                    <p>Final Score: <span id="final-score">0</span></p>
+                    <p>Moles Missed: <span id="final-misses">0</span></p>
+                    <p>Accuracy: <span id="accuracy">0</span>%</p>
+                </div>
+                <button id="play-again-btn" class="btn btn-start">Play Again</button>
+            </div>
+        </div>
+
+        <footer class="session-footer">
+            <span class="session-label">Session ID:</span>
+            <span id="session-id" class="session-value">Connecting...</span>
+        </footer>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="/static/js/game.js" type="module"></script>
+</body>
+
+</html>
