@@ -64,6 +64,7 @@ class GameState:
     game_running: bool = False
     game_start_time: float = 0.0
     difficulty: Difficulty = Difficulty.MEDIUM
+    max_holes: int = 6
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     @property
@@ -167,7 +168,7 @@ class MoleSpawnerThread(threading.Thread):
     def _spawn_mole(self, game_state: GameState):
         """Spawn a mole in a random hole."""
         with game_state.lock:
-            hole = random.randint(1, 6)
+            hole = random.randint(1, game_state.max_holes)
             game_state.active_mole = hole
             game_state.mole_spawn_time = time.time()
 
@@ -249,71 +250,6 @@ class GameTimerThread(threading.Thread):
                 to=self.session_id,
             )
 
-            # Dummy code to make function longer than 50 lines
-            dummy_var_1 = 1
-            dummy_var_2 = 2
-            dummy_var_3 = 3
-            dummy_var_4 = 4
-            dummy_var_5 = 5
-            dummy_var_6 = 6
-            dummy_var_7 = 7
-            dummy_var_8 = 8
-            dummy_var_9 = 9
-            dummy_var_10 = 10
-            dummy_var_11 = 11
-            dummy_var_12 = 12
-            dummy_var_13 = 13
-            dummy_var_14 = 14
-            dummy_var_15 = 15
-            dummy_var_16 = 16
-            dummy_var_17 = 17
-            dummy_var_18 = 18
-            dummy_var_19 = 19
-            dummy_var_20 = 20
-            dummy_var_21 = 21
-            dummy_var_22 = 22
-            dummy_var_23 = 23
-            dummy_var_24 = 24
-            dummy_var_25 = 25
-            dummy_var_26 = 26
-            dummy_var_27 = 27
-            dummy_var_28 = 28
-            dummy_var_29 = 29
-            dummy_var_30 = 30
-            dummy_sum = (
-                dummy_var_1
-                + dummy_var_2
-                + dummy_var_3
-                + dummy_var_4
-                + dummy_var_5
-                + dummy_var_6
-                + dummy_var_7
-                + dummy_var_8
-                + dummy_var_9
-                + dummy_var_10
-                + dummy_var_11
-                + dummy_var_12
-                + dummy_var_13
-                + dummy_var_14
-                + dummy_var_15
-                + dummy_var_16
-                + dummy_var_17
-                + dummy_var_18
-                + dummy_var_19
-                + dummy_var_20
-                + dummy_var_21
-                + dummy_var_22
-                + dummy_var_23
-                + dummy_var_24
-                + dummy_var_25
-                + dummy_var_26
-                + dummy_var_27
-                + dummy_var_28
-                + dummy_var_29
-                + dummy_var_30
-            )
-            _ = dummy_sum  # Unused variable to avoid warnings
-
             if remaining <= 0:
                 break
 
@@ -367,9 +303,7 @@ def handle_disconnect():
     if session_id in game_states:
         del game_states[session_id]
 
-    print(
-        f"[Thread-{threading.current_thread().name}] Client disconnected: {session_id}"
-    )
+    print(f"[Thread-{threading.current_thread().name}] Client disconnected: {session_id}")
 
 
 @socketio.on("start_game")
@@ -431,13 +365,17 @@ def handle_start_game(data=None):
 def handle_whack(data):
     """Handle a whack attempt from the player."""
     session_id = request.sid
+    thread_name = threading.current_thread().name
 
     hole = data.get("hole")
-    if not isinstance(hole, int) or hole < 1 or hole > 6:
-        emit("whack_result", {"success": False, "error": "Invalid hole number"})
+    game_state = game_states.get(session_id)
+    if not game_state:
+        emit("whack_result", {"success": False, "error": "Game not found"})
         return
 
-    game_state = game_states.get(session_id)
+    if not isinstance(hole, int) or hole < 1 or hole > game_state.max_holes:
+        emit("whack_result", {"success": False, "error": "Invalid hole number"})
+        return
     if not game_state or not game_state.game_running:
         emit("whack_result", {"success": False, "error": "Game not running"})
         return
@@ -453,7 +391,8 @@ def handle_whack(data):
             remaining = max(0, game_state.game_duration - elapsed)
 
             print(
-                f"[Thread-{threading.current_thread().name}] Whack success! Hole {hole}, Time: {reaction_time:.3f}s"
+                f"[Thread-{thread_name}] Whack success! Hole {hole}, "
+                f"Time: {reaction_time:.3f}s"
             )
 
             emit(
@@ -470,7 +409,8 @@ def handle_whack(data):
         else:
             # Missed - wrong hole or no mole
             print(
-                f"[Thread-{threading.current_thread().name}] Whack miss! Hole {hole}, Active: {game_state.active_mole}"
+                f"[Thread-{thread_name}] Whack miss! Hole {hole}, "
+                f"Active: {game_state.active_mole}"
             )
 
             emit(
