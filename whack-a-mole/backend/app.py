@@ -64,6 +64,7 @@ class GameState:
     game_running: bool = False
     game_start_time: float = 0.0
     difficulty: Difficulty = Difficulty.MEDIUM
+    max_holes: int = 6
     lock: threading.Lock = field(default_factory=threading.Lock)
 
     @property
@@ -167,7 +168,7 @@ class MoleSpawnerThread(threading.Thread):
     def _spawn_mole(self, game_state: GameState):
         """Spawn a mole in a random hole."""
         with game_state.lock:
-            hole = random.randint(1, 6)
+            hole = random.randint(1, game_state.max_holes)
             game_state.active_mole = hole
             game_state.mole_spawn_time = time.time()
 
@@ -302,9 +303,7 @@ def handle_disconnect():
     if session_id in game_states:
         del game_states[session_id]
 
-    print(
-        f"[Thread-{threading.current_thread().name}] Client disconnected: {session_id}"
-    )
+    print(f"[Thread-{threading.current_thread().name}] Client disconnected: {session_id}")
 
 
 @socketio.on("start_game")
@@ -366,13 +365,17 @@ def handle_start_game(data=None):
 def handle_whack(data):
     """Handle a whack attempt from the player."""
     session_id = request.sid
+    thread_name = threading.current_thread().name
 
     hole = data.get("hole")
-    if not isinstance(hole, int) or hole < 1 or hole > 6:
-        emit("whack_result", {"success": False, "error": "Invalid hole number"})
+    game_state = game_states.get(session_id)
+    if not game_state:
+        emit("whack_result", {"success": False, "error": "Game not found"})
         return
 
-    game_state = game_states.get(session_id)
+    if not isinstance(hole, int) or hole < 1 or hole > game_state.max_holes:
+        emit("whack_result", {"success": False, "error": "Invalid hole number"})
+        return
     if not game_state or not game_state.game_running:
         emit("whack_result", {"success": False, "error": "Game not running"})
         return
@@ -388,7 +391,8 @@ def handle_whack(data):
             remaining = max(0, game_state.game_duration - elapsed)
 
             print(
-                f"[Thread-{threading.current_thread().name}] Whack success! Hole {hole}, Time: {reaction_time:.3f}s"
+                f"[Thread-{thread_name}] Whack success! Hole {hole}, "
+                f"Time: {reaction_time:.3f}s"
             )
 
             emit(
@@ -405,7 +409,8 @@ def handle_whack(data):
         else:
             # Missed - wrong hole or no mole
             print(
-                f"[Thread-{threading.current_thread().name}] Whack miss! Hole {hole}, Active: {game_state.active_mole}"
+                f"[Thread-{thread_name}] Whack miss! Hole {hole}, "
+                f"Active: {game_state.active_mole}"
             )
 
             emit(
