@@ -26,6 +26,13 @@ dev = [
     "ruff>=0.1.0",
     "pre-commit>=3.5.0",
 ]
+test = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "pytest-asyncio>=0.23.0",
+    "flask-testing>=0.8.1",
+]
 
 [tool.ruff]
 line-length = 90
@@ -35,8 +42,13 @@ line-length = 90
 select = ["F", "E", "W", "PL"]
 
 [tool.ruff.lint.pylint]
-max-statements = 40
+max-statements = 25
 max-args = 10
 max-locals = 15
 max-branches = 12
+
+[tool.ruff.lint.per-file-ignores]
+# Allow magic values in tests (expected values are self-documenting)
+# Allow E402 in conftest.py (sys.path modification must happen before imports)
+"tests/**" = ["PLR2004", "E402"]
 
