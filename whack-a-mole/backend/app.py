@@ -308,7 +308,49 @@ def handle_disconnect():
 
 @socketio.on("start_game")
 def handle_start_game(data=None):
-    """Start a new game with specified difficulty."""
+    """
+    Start a new game with specified difficulty.
+
+    This WebSocket event handler initializes a new game session. It stops any existing
+    game threads, resets the game state, and spawns new background threads
+    (MoleSpawnerThread and GameTimerThread) to manage the game loop. The difficulty
+    level determines game parameters like mole timeout, spawn delays, and game
+    duration.
+
+    Args:
+        data (dict, optional): Dictionary containing game initialization data.
+            Expected keys:
+                - difficulty (str): Difficulty level ('easy', 'medium', or 'hard').
+                                   Defaults to 'medium' if not provided or invalid.
+
+    Emits:
+        game_started (dict): Confirmation that the game has started.
+            - duration (int): Total game duration in seconds
+            - difficulty (str): Selected difficulty level
+            - mole_timeout (float): Time window to whack each mole (seconds)
+            - message (str): Informational message about the game start
+
+    Side Effects:
+        - Stops and cleans up any existing game threads for this session
+        - Resets the GameState for this session
+        - Creates and starts two daemon threads:
+            * MoleSpawnerThread: Spawns moles at random intervals
+            * GameTimerThread: Broadcasts time updates every second
+        - Joins the session-specific room for targeted WebSocket emits
+
+    Thread Safety:
+        Creates new background threads that will safely interact with shared
+        game state using the GameState.lock mutex.
+
+    Examples:
+        Client sends: {"difficulty": "hard"}
+        Server emits: {
+            "duration": 45,
+            "difficulty": "hard",
+            "mole_timeout": 1.0,
+            "message": "Game started on HARD mode!"
+        }
+    """
     session_id = request.sid
 
     # Parse difficulty from request
@@ -363,7 +405,44 @@ def handle_start_game(data=None):
 
 @socketio.on("whack")
 def handle_whack(data):
-    """Handle a whack attempt from the player."""
+    """
+    Handle a whack attempt from the player.
+
+    This WebSocket event handler processes player clicks on mole holes. It validates
+    the attempt, checks if the player hit an active mole, updates the score/misses,
+    and emits the result back to the client.
+
+    Args:
+        data (dict): Dictionary containing the whack attempt data.
+            Expected keys:
+                - hole (int): The hole number (1-6) that was clicked.
+
+    Emits:
+        whack_result (dict): Result of the whack attempt.
+            On success:
+                - success (bool): True
+                - hole (int): The hole that was whacked
+                - score (int): Updated player score
+                - misses (int): Current miss count
+                - reaction_time (float): Time taken to whack the mole (seconds)
+                - time_remaining (float): Remaining game time (seconds)
+            On failure:
+                - success (bool): False
+                - hole (int): The hole that was clicked
+                - active_mole (int|None): The actual active mole hole (if any)
+                - score (int): Current player score
+                - misses (int): Current miss count
+                - error (str): Error message (if validation failed)
+
+    Thread Safety:
+        Uses game_state.lock to ensure thread-safe access to shared game state,
+        preventing race conditions with the MoleSpawnerThread.
+
+    Validation:
+        - Checks if hole number is valid (1 to max_holes)
+        - Verifies game state exists
+        - Confirms game is currently running
+    """
     session_id = request.sid
     thread_name = threading.current_thread().name
 
