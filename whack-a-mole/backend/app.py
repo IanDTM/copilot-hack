@@ -403,6 +403,54 @@ def handle_start_game(data=None):
     )
 
 
+def _process_whack_attempt(game_state: GameState, hole: int, current_time: float) -> dict:
+    """
+    Process a whack attempt and return the result data.
+
+    Args:
+        game_state: The current game state
+        hole: The hole number that was clicked
+        current_time: The current timestamp
+
+    Returns:
+        dict: Result data containing success status, scores, and timing info
+    """
+    with game_state.lock:
+        if game_state.active_mole == hole:
+            # Successful whack!
+            game_state.score += 1
+            reaction_time = current_time - game_state.mole_spawn_time
+            game_state.active_mole = None
+            elapsed = current_time - game_state.game_start_time
+            remaining = max(0, game_state.game_duration - elapsed)
+
+            # Capture values before releasing lock
+            score = game_state.score
+            misses = game_state.misses
+
+            return {
+                "success": True,
+                "hole": hole,
+                "score": score,
+                "misses": misses,
+                "reaction_time": reaction_time,
+                "time_remaining": remaining,
+            }
+        else:
+            # Missed - wrong hole or no mole
+            active_mole = game_state.active_mole
+            score = game_state.score
+            misses = game_state.misses
+
+            return {
+                "success": False,
+                "hole": hole,
+                "score": score,
+                "misses": misses,
+                "active_mole": active_mole,
+            }
+
+
 @socketio.on("whack")
 def handle_whack(data):
     """
@@ -455,53 +503,28 @@ def handle_whack(data):
     if not isinstance(hole, int) or hole < 1 or hole > game_state.max_holes:
         emit("whack_result", {"success": False, "error": "Invalid hole number"})
         return
-    if not game_state or not game_state.game_running:
+
+    if not game_state.game_running:
         emit("whack_result", {"success": False, "error": "Game not running"})
         return
 
-    with game_state.lock:
-        if game_state.active_mole == hole:
-            # Successful whack!
-            game_state.score += 1
-            reaction_time = time.time() - game_state.mole_spawn_time
-            game_state.active_mole = None
+    # Process the whack attempt
+    current_time = time.time()
+    result = _process_whack_attempt(game_state, hole, current_time)
 
-            elapsed = time.time() - game_state.game_start_time
-            remaining = max(0, game_state.game_duration - elapsed)
+    # Log the result
+    if result["success"]:
+        print(
+            f"[Thread-{thread_name}] Whack success!"
+            f" Hole {hole}, Time: {result['reaction_time']:.3f}s"
+        )
+    else:
+        print(
+            f"[Thread-{thread_name}] Whack miss! "
+            f"Hole {hole}, Active: {result['active_mole']}"
+        )
 
-            print(
-                f"[Thread-{thread_name}] Whack success! Hole {hole}, "
-                f"Time: {reaction_time:.3f}s"
-            )
-
-            emit(
-                "whack_result",
-                {
-                    "success": True,
-                    "hole": hole,
-                    "score": game_state.score,
-                    "misses": game_state.misses,
-                    "reaction_time": reaction_time,
-                    "time_remaining": remaining,
-                },
-            )
-        else:
-            # Missed - wrong hole or no mole
-            print(
-                f"[Thread-{thread_name}] Whack miss! Hole {hole}, "
-                f"Active: {game_state.active_mole}"
-            )
-
-            emit(
-                "whack_result",
-                {
-                    "success": False,
-                    "hole": hole,
-                    "active_mole": game_state.active_mole,
-                    "score": game_state.score,
-                    "misses": game_state.misses,
-                },
-            )
+    emit("whack_result", result)
 
 
 @socketio.on("stop_game")
