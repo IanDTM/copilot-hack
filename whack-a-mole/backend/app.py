@@ -572,6 +572,11 @@ def handle_get_high_scores():
     emit("high_scores_update", high_scores)
 
 
+# Maximum multiplier for score validation (conservative upper bound)
+# This accounts for ~2 whacks per second at maximum
+MAX_SCORE_MULTIPLIER = 2
+
+
 def _sanitize_name(name: str) -> str:
     """
     Sanitize player name to prevent XSS and injection attacks.
@@ -608,7 +613,7 @@ def _validate_score(score: any, game_state: GameState) -> bool:
         return False
     # Score should be reasonable (not impossibly high)
     # Maximum possible score is roughly game_duration / (min mole spawn + processing time)
-    max_possible_score = game_state.game_duration * 2  # Conservative upper bound
+    max_possible_score = game_state.game_duration * MAX_SCORE_MULTIPLIER
     if score > max_possible_score:
         return False
     return True
@@ -627,6 +632,11 @@ def handle_submit_score(data):
 
     if not game_state:
         emit("score_submission_error", {"error": "Invalid session"})
+        return
+
+    # SECURITY: Validate data input
+    if not isinstance(data, dict):
+        emit("score_submission_error", {"error": "Invalid data format"})
         return
 
     # Sanitize and validate inputs
@@ -668,7 +678,7 @@ if __name__ == "__main__":
 
     # SECURITY: Remove allow_unsafe_werkzeug in production
     # This flag should only be used in development
-    debug_mode = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
+    debug_mode = os.environ.get("FLASK_DEBUG", "False").lower() in ("true", "1")
 
     if debug_mode:
         print("WARNING: Running in DEBUG mode with unsafe Werkzeug!")
