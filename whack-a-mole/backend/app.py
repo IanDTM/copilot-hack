@@ -308,7 +308,49 @@ def handle_disconnect():
 
 @socketio.on("start_game")
 def handle_start_game(data=None):
-    """Start a new game with specified difficulty."""
+    """
+    Start a new game with specified difficulty.
+
+    This WebSocket event handler initializes a new game session. It stops any existing
+    game threads, resets the game state, and spawns new background threads
+    (MoleSpawnerThread and GameTimerThread) to manage the game loop. The difficulty
+    level determines game parameters like mole timeout, spawn delays, and game
+    duration.
+
+    Args:
+        data (dict, optional): Dictionary containing game initialization data.
+            Expected keys:
+                - difficulty (str): Difficulty level ('easy', 'medium', or 'hard').
+                                   Defaults to 'medium' if not provided or invalid.
+
+    Emits:
+        game_started (dict): Confirmation that the game has started.
+            - duration (int): Total game duration in seconds
+            - difficulty (str): Selected difficulty level
+            - mole_timeout (float): Time window to whack each mole (seconds)
+            - message (str): Informational message about the game start
+
+    Side Effects:
+        - Stops and cleans up any existing game threads for this session
+        - Resets the GameState for this session
+        - Creates and starts two daemon threads:
+            * MoleSpawnerThread: Spawns moles at random intervals
+            * GameTimerThread: Broadcasts time updates every second
+        - Joins the session-specific room for targeted WebSocket emits
+
+    Thread Safety:
+        Creates new background threads that will safely interact with shared
+        game state using the GameState.lock mutex.
+
+    Examples:
+        Client sends: {"difficulty": "hard"}
+        Server emits: {
+            "duration": 45,
+            "difficulty": "hard",
+            "mole_timeout": 1.0,
+            "message": "Game started on HARD mode!"
+        }
+    """
     session_id = request.sid
 
     # Parse difficulty from request
@@ -361,9 +403,94 @@ def handle_start_game(data=None):
     )
 
 
+def _process_whack_attempt(game_state: GameState, hole: int, current_time: float) -> dict:
+    """
+    Process a whack attempt and return the result data.
+
+    Args:
+        game_state: The current game state
+        hole: The hole number that was clicked
+        current_time: The current timestamp
+
+    Returns:
+        dict: Result data containing success status, scores, and timing info
+    """
+    with game_state.lock:
+        if game_state.active_mole == hole:
+            # Successful whack!
+            game_state.score += 1
+            reaction_time = current_time - game_state.mole_spawn_time
+            game_state.active_mole = None
+            elapsed = current_time - game_state.game_start_time
+            remaining = max(0, game_state.game_duration - elapsed)
+
+            # Capture values before releasing lock
+            score = game_state.score
+            misses = game_state.misses
+
+            return {
+                "success": True,
+                "hole": hole,
+                "score": score,
+                "misses": misses,
+                "reaction_time": reaction_time,
+                "time_remaining": remaining,
+            }
+        else:
+            # Missed - wrong hole or no mole
+            active_mole = game_state.active_mole
+            score = game_state.score
+            misses = game_state.misses
+
+            return {
+                "success": False,
+                "hole": hole,
+                "score": score,
+                "misses": misses,
+                "active_mole": active_mole,
+            }
+
+
 @socketio.on("whack")
 def handle_whack(data):
-    """Handle a whack attempt from the player."""
+    """
+    Handle a whack attempt from the player.
+
+    This WebSocket event handler processes player clicks on mole holes. It validates
+    the attempt, checks if the player hit an active mole, updates the score/misses,
+    and emits the result back to the client.
+
+    Args:
+        data (dict): Dictionary containing the whack attempt data.
+            Expected keys:
+                - hole (int): The hole number (1-6) that was clicked.
+
+    Emits:
+        whack_result (dict): Result of the whack attempt.
+            On success:
+                - success (bool): True
+                - hole (int): The hole that was whacked
+                - score (int): Updated player score
+                - misses (int): Current miss count
+                - reaction_time (float): Time taken to whack the mole (seconds)
+                - time_remaining (float): Remaining game time (seconds)
+            On failure:
+                - success (bool): False
+                - hole (int): The hole that was clicked
+                - active_mole (int|None): The actual active mole hole (if any)
+                - score (int): Current player score
+                - misses (int): Current miss count
+                - error (str): Error message (if validation failed)
+
+    Thread Safety:
+        Uses game_state.lock to ensure thread-safe access to shared game state,
+        preventing race conditions with the MoleSpawnerThread.
+
+    Validation:
+        - Checks if hole number is valid (1 to max_holes)
+        - Verifies game state exists
+        - Confirms game is currently running
+    """
     session_id = request.sid
     thread_name = threading.current_thread().name
 
@@ -376,53 +503,28 @@ def handle_whack(data):
     if not isinstance(hole, int) or hole < 1 or hole > game_state.max_holes:
         emit("whack_result", {"success": False, "error": "Invalid hole number"})
         return
-    if not game_state or not game_state.game_running:
+
+    if not game_state.game_running:
         emit("whack_result", {"success": False, "error": "Game not running"})
         return
 
-    with game_state.lock:
-        if game_state.active_mole == hole:
-            # Successful whack!
-            game_state.score += 1
-            reaction_time = time.time() - game_state.mole_spawn_time
-            game_state.active_mole = None
+    # Process the whack attempt
+    current_time = time.time()
+    result = _process_whack_attempt(game_state, hole, current_time)
 
-            elapsed = time.time() - game_state.game_start_time
-            remaining = max(0, game_state.game_duration - elapsed)
+    # Log the result
+    if result["success"]:
+        print(
+            f"[Thread-{thread_name}] Whack success!"
+            f" Hole {hole}, Time: {result['reaction_time']:.3f}s"
+        )
+    else:
+        print(
+            f"[Thread-{thread_name}] Whack miss! "
+            f"Hole {hole}, Active: {result['active_mole']}"
+        )
 
-            print(
-                f"[Thread-{thread_name}] Whack success! Hole {hole}, "
-                f"Time: {reaction_time:.3f}s"
-            )
-
-            emit(
-                "whack_result",
-                {
-                    "success": True,
-                    "hole": hole,
-                    "score": game_state.score,
-                    "misses": game_state.misses,
-                    "reaction_time": reaction_time,
-                    "time_remaining": remaining,
-                },
-            )
-        else:
-            # Missed - wrong hole or no mole
-            print(
-                f"[Thread-{thread_name}] Whack miss! Hole {hole}, "
-                f"Active: {game_state.active_mole}"
-            )
-
-            emit(
-                "whack_result",
-                {
-                    "success": False,
-                    "hole": hole,
-                    "active_mole": game_state.active_mole,
-                    "score": game_state.score,
-                    "misses": game_state.misses,
-                },
-            )
+    emit("whack_result", result)
 
 
 @socketio.on("stop_game")
