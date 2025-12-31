@@ -3,7 +3,9 @@ Whack-a-Mole Game Backend
 Multi-threaded Flask server with WebSocket support for real-time game communication.
 """
 
+import os
 import random
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -18,8 +20,12 @@ app = Flask(
     static_folder="../frontend/static",
     template_folder="../frontend/templates",
 )
-app.config["SECRET_KEY"] = "whack-a-mole-secret-key"
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+# SECURITY: Use environment variable for secret key instead of hardcoding
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(24).hex())
+# SECURITY: Restrict CORS to specific origins in production
+# For development, you can use "*", but in production set ALLOWED_ORIGINS env var
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+socketio = SocketIO(app, cors_allowed_origins=allowed_origins, async_mode="threading")
 
 
 class Difficulty(Enum):
@@ -307,7 +313,7 @@ def handle_disconnect():
 
 
 @socketio.on("start_game")
-def handle_start_game(data=None):
+def handle_start_game(data=None):  # noqa: PLR0915
     """
     Start a new game with specified difficulty.
 
@@ -353,10 +359,19 @@ def handle_start_game(data=None):
     """
     session_id = request.sid
 
+    # SECURITY: Validate data input
+    if data is not None and not isinstance(data, dict):
+        emit("error", {"message": "Invalid data format"})
+        return
+
     # Parse difficulty from request
     difficulty_str = (data or {}).get("difficulty", "medium")
+    # SECURITY: Validate difficulty is a string and one of allowed values
+    if not isinstance(difficulty_str, str):
+        difficulty_str = "medium"
+
     try:
-        difficulty = Difficulty(difficulty_str)
+        difficulty = Difficulty(difficulty_str.lower())
     except ValueError:
         difficulty = Difficulty.MEDIUM
 
@@ -494,12 +509,18 @@ def handle_whack(data):
     session_id = request.sid
     thread_name = threading.current_thread().name
 
+    # SECURITY: Validate data input
+    if not isinstance(data, dict):
+        emit("whack_result", {"success": False, "error": "Invalid data format"})
+        return
+
     hole = data.get("hole")
     game_state = game_states.get(session_id)
     if not game_state:
         emit("whack_result", {"success": False, "error": "Game not found"})
         return
 
+    # SECURITY: Strict type and range validation for hole number
     if not isinstance(hole, int) or hole < 1 or hole > game_state.max_holes:
         emit("whack_result", {"success": False, "error": "Invalid hole number"})
         return
@@ -551,16 +572,90 @@ def handle_get_high_scores():
     emit("high_scores_update", high_scores)
 
 
+# Maximum multiplier for score validation (conservative upper bound)
+# This accounts for ~2 whacks per second at maximum
+MAX_SCORE_MULTIPLIER = 2
+
+
+def _sanitize_name(name: str) -> str:
+    """
+    Sanitize player name to prevent XSS and injection attacks.
+
+    Args:
+        name: Raw player name input
+
+    Returns:
+        Sanitized name string (alphanumeric, spaces, hyphens, underscores only)
+    """
+    # Remove any HTML/script tags and special characters
+    # Allow only alphanumeric, spaces, hyphens, and underscores
+    sanitized = re.sub(r'[^a-zA-Z0-9\s\-_]', '', str(name))
+    # Limit length and strip whitespace
+    return sanitized[:10].strip() or "Anonymous"
+
+
+def _validate_score(score: any, game_state: GameState) -> bool:
+    """
+    Validate that a submitted score is legitimate.
+
+    Args:
+        score: The score value to validate
+        game_state: Current game state to check bounds
+
+    Returns:
+        True if score is valid, False otherwise
+    """
+    # Score must be an integer
+    if not isinstance(score, int):
+        return False
+    # Score must be non-negative
+    if score < 0:
+        return False
+    # Score should be reasonable (not impossibly high)
+    # Maximum possible score is roughly game_duration / (min mole spawn + processing time)
+    max_possible_score = game_state.game_duration * MAX_SCORE_MULTIPLIER
+    if score > max_possible_score:
+        return False
+    return True
+
+
 @socketio.on("submit_score")
 def handle_submit_score(data):
-    """Handle high score submission."""
-    name = data.get("name", "Anonymous")
+    """
+    Handle high score submission with security validations.
+
+    SECURITY: Validates and sanitizes all user inputs to prevent XSS and
+    injection attacks.
+    """
+    session_id = request.sid
+    game_state = game_states.get(session_id)
+
+    if not game_state:
+        emit("score_submission_error", {"error": "Invalid session"})
+        return
+
+    # SECURITY: Validate data input
+    if not isinstance(data, dict):
+        emit("score_submission_error", {"error": "Invalid data format"})
+        return
+
+    # Sanitize and validate inputs
+    raw_name = data.get("name", "Anonymous")
+    name = _sanitize_name(raw_name)
+
     score = data.get("score", 0)
+    if not _validate_score(score, game_state):
+        emit("score_submission_error", {"error": "Invalid score"})
+        return
+
     difficulty = data.get("difficulty", "medium")
+    # Validate difficulty is one of the allowed values
+    if difficulty not in ["easy", "medium", "hard"]:
+        difficulty = "medium"
 
     # Add new score
     new_entry = {
-        "name": name[:10],  # Limit name length
+        "name": name,
         "score": score,
         "difficulty": difficulty,
         "date": time.strftime("%Y-%m-%d"),
@@ -580,4 +675,22 @@ if __name__ == "__main__":
     print("Whack-a-Mole Game Server")
     print("Multi-threaded backend with WebSocket support")
     print("=" * 50)
-    socketio.run(app, host="0.0.0.0", port=5000, debug=True, allow_unsafe_werkzeug=True)
+
+    # SECURITY: Remove allow_unsafe_werkzeug in production
+    # This flag should only be used in development
+    debug_mode = os.environ.get("FLASK_DEBUG", "False").lower() in ("true", "1")
+
+    if debug_mode:
+        print("WARNING: Running in DEBUG mode with unsafe Werkzeug!")
+        print("         Do NOT use this configuration in production!")
+        socketio.run(
+            app,
+            host="0.0.0.0",
+            port=5000,
+            debug=True,
+            allow_unsafe_werkzeug=True
+        )
+    else:
+        # Production mode - use a proper WSGI server like gunicorn or eventlet
+        print("Running in PRODUCTION mode")
+        socketio.run(app, host="0.0.0.0", port=5000, debug=False)
